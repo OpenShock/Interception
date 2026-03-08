@@ -1,0 +1,211 @@
+@using OpenShock.Desktop.ModuleBase
+@using OpenShock.Desktop.ModuleBase.Api
+@using OpenShock.Desktop.Modules.Interception.Certificates
+@using OpenShock.Desktop.Modules.Interception.HostsFile
+<MudPaper Outlined="true" Class="settings-wrap">
+    <!-- Title -->
+    <MudText Typo="Typo.h6" Class="mb-2">PiShock API Interception</MudText>
+    <MudDivider Class="mb-4"/>
+
+    @* Server Section *@
+    <MudPaper Class="pa-4 mb-4 rounded-lg" Outlined="true">
+        <MudText Typo="Typo.h6" Class="mb-2">Server</MudText>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="4">
+            <MudSwitch T="bool" Color="Color.Primary"
+                       Value="@Service.IsRunning"
+                       ValueChanged="@OnServerToggle"
+                       Label="@(Service.IsRunning ? "Running" : "Stopped")"/>
+            <MudChip T="string" Color="@(Service.IsRunning ? Color.Success : Color.Default)" Size="Size.Small">
+                @(Service.IsRunning ? "Active" : "Inactive")
+            </MudChip>
+        </MudStack>
+        <MudNumericField T="ushort" Label="Port" Value="@Service.Config.Port"
+                         ValueChanged="@OnPortChanged" Min="1" Max="65535"
+                         Disabled="@Service.IsRunning" Class="mt-2" Style="max-width: 200px;"/>
+    </MudPaper>
+
+    @* Hosts File Redirect *@
+    <MudPaper Class="pa-4 mb-4 rounded-lg" Outlined="true">
+        <MudText Typo="Typo.h6" Class="mb-2">Hosts File Redirect</MudText>
+        <MudText Typo="Typo.body2" Class="mb-2">
+            Redirects do.pishock.com to 127.0.0.1 via the system hosts file.
+            Each action requires administrator elevation.
+        </MudText>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudChip T="string" Color="@(HostsManager.IsEnabled ? Color.Success : Color.Default)" Size="Size.Small">
+                @(HostsManager.IsEnabled ? "Active" : "Inactive")
+            </MudChip>
+            @if (!HostsManager.IsEnabled)
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Warning" OnClick="@AddHostsEntry">
+                    Add Hosts Entry
+                </MudButton>
+            }
+            else
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="@RemoveHostsEntry">
+                    Remove Hosts Entry
+                </MudButton>
+            }
+        </MudStack>
+    </MudPaper>
+
+    @* Certificate Status *@
+    <MudPaper Class="pa-4 mb-4 rounded-lg" Outlined="true">
+        <MudText Typo="Typo.h6" Class="mb-2">Certificate</MudText>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon
+                Icon="@(CertManager.IsCaTrusted ? Icons.Material.Filled.VerifiedUser : Icons.Material.Filled.Warning)"
+                Color="@(CertManager.IsCaTrusted ? Color.Success : Color.Warning)"/>
+            <MudText>
+                CA Certificate: @(CertManager.IsCaTrusted ? "Trusted" : "Not trusted")
+            </MudText>
+        </MudStack>
+        @if (!CertManager.IsCaTrusted)
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="mt-2"
+                       OnClick="@InstallCaCert">
+                Install CA Certificate
+            </MudButton>
+        }
+        else
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Error" Class="mt-2"
+                       OnClick="@RemoveCaCert">
+                Remove CA Certificate
+            </MudButton>
+        }
+    </MudPaper>
+
+    @* Share Code Mappings *@
+    <MudPaper Class="pa-4 mb-4 rounded-lg" Outlined="true">
+        <MudText Typo="Typo.h6" Class="mb-2">Share Code Mappings</MudText>
+        <MudText Typo="Typo.body2" Class="mb-2">
+            Map PiShock share codes to OpenShock shockers.
+        </MudText>
+
+        <MudTable Items="@Service.Config.ShareCodeMappings" Dense="true" Hover="true">
+            <HeaderContent>
+                <MudTh>Share Code</MudTh>
+                <MudTh>OpenShock Shocker</MudTh>
+                <MudTh Style="width: 60px;"></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Key</MudTd>
+                <MudTd>@GetShockerName(context.Value)</MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                   Color="Color.Error" OnClick="@(() => RemoveMapping(context.Key))"/>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+
+        <MudStack Row="true" AlignItems="AlignItems.End" Class="mt-3" Spacing="2">
+            <MudTextField T="string" Value="@_newShareCode" ValueChanged="@((string v) => _newShareCode = v)"
+                          Label="Share Code" Style="max-width: 200px;"/>
+            <MudSelect T="Guid" Value="@_selectedShockerId" ValueChanged="@((Guid v) => _selectedShockerId = v)"
+                       Label="Shocker" Style="max-width: 300px;">
+                @foreach (var hub in OpenShockData.Hubs.Value)
+                {
+                    foreach (var shocker in hub.Shockers)
+                    {
+                        <MudSelectItem T="Guid" Value="@shocker.Id">@hub.Name / @shocker.Name</MudSelectItem>
+                    }
+                }
+            </MudSelect>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@AddMapping"
+                       Disabled="@(string.IsNullOrWhiteSpace(_newShareCode) || _selectedShockerId == Guid.Empty)">
+                Add
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+</MudPaper>
+
+<style>
+
+    .settings-wrap {
+        max-width: 920px;
+        margin: 0 auto;
+        padding: 16px;
+        border-radius: 12px;
+    }
+
+</style>
+
+@code {
+    [ModuleInject] public required InterceptionService Service { get; set; }
+    [ModuleInject] public required IOpenShockData OpenShockData { get; set; }
+    [ModuleInject] public required CertificateManager CertManager { get; set; }
+    [ModuleInject] public required HostsFileManager HostsManager { get; set; }
+
+    private string _newShareCode = string.Empty;
+    private Guid _selectedShockerId;
+
+    private async Task OnServerToggle(bool value)
+    {
+        if (value)
+            await Service.StartAsync();
+        else
+            await Service.StopAsync();
+        StateHasChanged();
+    }
+
+    private async Task OnPortChanged(ushort port)
+    {
+        await Service.UpdateConfig(c => c.Port = port);
+    }
+
+    private async Task AddHostsEntry()
+    {
+        await HostsManager.EnableAsync();
+        StateHasChanged();
+    }
+
+    private async Task RemoveHostsEntry()
+    {
+        await HostsManager.DisableAsync();
+        StateHasChanged();
+    }
+
+    private void InstallCaCert()
+    {
+        CertManager.InstallCaCertificate();
+        StateHasChanged();
+    }
+
+    private void RemoveCaCert()
+    {
+        CertManager.RemoveCaCertificate();
+        StateHasChanged();
+    }
+
+    private async Task AddMapping()
+    {
+        if (string.IsNullOrWhiteSpace(_newShareCode) || _selectedShockerId == Guid.Empty) return;
+        await Service.UpdateConfig(c => c.ShareCodeMappings[_newShareCode] = _selectedShockerId);
+        _newShareCode = string.Empty;
+        _selectedShockerId = Guid.Empty;
+        StateHasChanged();
+    }
+
+    private async Task RemoveMapping(string code)
+    {
+        await Service.UpdateConfig(c => c.ShareCodeMappings.Remove(code));
+        StateHasChanged();
+    }
+
+    private string GetShockerName(Guid shockerId)
+    {
+        foreach (var hub in OpenShockData.Hubs.Value)
+        {
+            foreach (var shocker in hub.Shockers)
+            {
+                if (shocker.Id == shockerId)
+                    return $"{hub.Name} / {shocker.Name}";
+            }
+        }
+
+        return shockerId.ToString();
+    }
+
+}

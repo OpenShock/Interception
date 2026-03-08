@@ -1,0 +1,1 @@
+copy Interception\bin\Debug\net10.0\OpenShock.Desktop.Modules.Interception.dll %appdata%\OpenShock\Desktop\modules\openshock.desktop.modules.interception\OpenShock.Desktop.Modules.Interception.dll
