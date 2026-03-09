@@ -2,6 +2,12 @@
 
 A desktop module for [OpenShock Desktop](https://github.com/openshock/desktop) that intercepts PiShock API calls and redirects them through OpenShock.
 
+## Installation
+[![Downloads](https://img.shields.io/github/downloads/OpenShock/Desktop/total?style=for-the-badge&color=e14a6d)](https://github.com/OpenShock/Desktop/releases/latest)
+
+Download the latest [OpenShock Desktop](https://github.com/OpenShock/Desktop/releases/latest) release and install the Interception module from the OpenShock Module Manager.   
+Follow the prompts to set up the local HTTPS server and configure share code mappings.
+
 ## How It Works
 
 This module runs a local HTTPS server that impersonates `do.pishock.com`. Applications that use the PiShock API will have their requests intercepted and translated into OpenShock control commands.
