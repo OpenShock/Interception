@@ -19,6 +19,8 @@ public class InterceptionMain(ILogger<InterceptionMain> logger, ILoggerFactory l
     public override Type RootComponent => typeof(InterceptionPage);
 
     public override IReadOnlyCollection<NavigationItem> NavigationComponents { get; } = [];
+    
+    public override IconOneOf Icon => IconOneOf.FromPath("/OpenShock/Desktop/Modules/Interception/interception.svg");
 
     public override async Task Setup()
     {

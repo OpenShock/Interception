@@ -1,11 +1,26 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
 
     <PropertyGroup>
-        <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <EnableDefaultCssItems>false</EnableDefaultCssItems>
         <AssemblyName>OpenShock.Desktop.Modules.Interception</AssemblyName>
         <RootNamespace>OpenShock.Desktop.Modules.Interception</RootNamespace>
+
+        <Company>OpenShock</Company>
+        <Product>Medal</Product>
+
+        <AssemblyVersion>1.0.0</AssemblyVersion>
+        <Version>1.0.0</Version>
+
+        <ResourceLanguages>en</ResourceLanguages>
+        <SatelliteResourceLanguages>en-US;en</SatelliteResourceLanguages>
+        <IsPackable>false</IsPackable>
+
+        <Configurations>Debug;Release</Configurations>
+
+        <Platforms>AnyCPU</Platforms>
+        <TargetFramework>net10.0</TargetFramework>
     </PropertyGroup>
 
     <ItemGroup>
@@ -13,6 +28,11 @@
         <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.3"/>
         <PackageReference Include="MudBlazor" Version="8.5.0"/>
         <PackageReference Include="OpenShock.Desktop.ModuleBase" Version="1.1.2"/>
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="interception.svg" />
+      <EmbeddedResource Include="interception.svg" />
     </ItemGroup>
 
 </Project>
