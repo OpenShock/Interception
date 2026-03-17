@@ -6,6 +6,7 @@
         <EnableDefaultCssItems>false</EnableDefaultCssItems>
         <AssemblyName>OpenShock.Desktop.Modules.Interception</AssemblyName>
         <RootNamespace>OpenShock.Desktop.Modules.Interception</RootNamespace>
+        <OpenShockModuleId>openshock.desktop.modules.interception</OpenShockModuleId>
 
         <Company>OpenShock</Company>
         <Product>Medal</Product>
@@ -27,7 +28,7 @@
         <PackageReference Include="EmbedIO" Version="3.5.2"/>
         <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.3"/>
         <PackageReference Include="MudBlazor" Version="8.5.0"/>
-        <PackageReference Include="OpenShock.Desktop.ModuleBase" Version="1.1.2"/>
+        <PackageReference Include="OpenShock.Desktop.ModuleBase" Version="1.1.2-dev.230" />
     </ItemGroup>
 
     <ItemGroup>
