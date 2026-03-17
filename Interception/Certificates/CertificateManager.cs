@@ -107,6 +107,7 @@ public sealed class CertificateManager : IDisposable
 
         var sanBuilder = new SubjectAlternativeNameBuilder();
         sanBuilder.AddDnsName("do.pishock.com");
+        sanBuilder.AddDnsName("ps.pishock.com");
         sanBuilder.AddIpAddress(IPAddress.Loopback);
         req.CertificateExtensions.Add(sanBuilder.Build());
 

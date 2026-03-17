@@ -6,16 +6,20 @@ namespace OpenShock.Desktop.Modules.Interception.HostsFile;
 public sealed class HostsFileManager
 {
     private const string HostsPath = @"C:\Windows\System32\drivers\etc\hosts";
-    private const string HostEntry = "127.0.0.1 do.pishock.com";
     private const string Marker = "# OpenShock Interception";
+
+    private static readonly string[] HostEntries =
+    [
+        $"127.0.0.1 do.pishock.com {Marker}",
+        $"127.0.0.1 ps.pishock.com {Marker}"
+    ];
 
     public bool IsEnabled { get; private set; }
 
     public async Task EnableAsync()
     {
         if (IsEnabled) return;
-        var line = $"{HostEntry} {Marker}";
-        await RunElevatedHostsCommand($"add \"{line}\"");
+        await RunElevatedHostsCommand("add");
         IsEnabled = true;
         await FlushDns();
     }
@@ -44,15 +48,16 @@ public sealed class HostsFileManager
     private static async Task RunElevatedHostsCommand(string action)
     {
         string script;
-        if (action.StartsWith("add"))
+        if (action == "add")
         {
-            var line = action.Substring(4).Trim();
+            var linesArray = string.Join(",", HostEntries.Select(e => $"'{e}'"));
             script = string.Join("\n",
-                $"$line = {line};",
+                $"$lines = @({linesArray});",
                 $"$hostsPath = '{HostsPath}';",
                 "$content = Get-Content $hostsPath -Raw -ErrorAction SilentlyContinue;",
                 "if ($content -notmatch 'OpenShock Interception') {",
-                "    Add-Content -Path $hostsPath -Value \"`n$line\" -NoNewline:$false",
+                "    $toAdd = \"`n\" + ($lines -join \"`n\");",
+                "    Add-Content -Path $hostsPath -Value $toAdd -NoNewline:$false",
                 "}");
         }
         else

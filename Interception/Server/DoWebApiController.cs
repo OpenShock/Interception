@@ -56,11 +56,20 @@ public sealed class DoWebApiController : WebApiController
             return;
         }
 
-        if (!_service.Config.ShareCodeMappings.TryGetValue(request.Code, out var shockerId))
+        if (!_service.Config.ShareCodeMappings.TryGetValue(request.Code, out var mapping))
         {
             _logger.LogError("Share code not mapped to any shocker: {Code}", request.Code);
             HttpContext.Response.StatusCode = 404;
             await HttpContext.SendStringAsync("Share code not mapped to any shocker", "text/plain",
+                Encoding.UTF8);
+            return;
+        }
+
+        if (mapping.ShockerIds.Count == 0)
+        {
+            _logger.LogError("Share code has no shockers configured: {Code}", request.Code);
+            HttpContext.Response.StatusCode = 404;
+            await HttpContext.SendStringAsync("Share code has no shockers configured", "text/plain",
                 Encoding.UTF8);
             return;
         }
@@ -73,21 +82,18 @@ public sealed class DoWebApiController : WebApiController
             _ => ControlType.Vibrate
         };
 
-        var durationMs = (ushort)Math.Clamp(request.Duration * 1000, 300, 30000);
-        var intensity = (byte)Math.Clamp(request.Intensity, 1, 100);
+        var durationMs = (ushort)Math.Clamp(request.Duration * 1000, mapping.MinDuration * 1000, mapping.MaxDuration * 1000);
+        var intensity = (byte)Math.Clamp(request.Intensity, mapping.MinIntensity, mapping.MaxIntensity);
 
         if (request.Intensity <= 0) controlType = ControlType.Stop;
 
-        var controls = new[]
+        var controls = mapping.ShockerIds.Select(id => new ShockerControl
         {
-            new ShockerControl
-            {
-                Id = shockerId,
-                Type = controlType,
-                Intensity = intensity,
-                Duration = durationMs
-            }
-        };
+            Id = id,
+            Type = controlType,
+            Intensity = intensity,
+            Duration = durationMs
+        }).ToArray();
 
         var customName = request.Name ?? request.Username ?? "PiShock Interception";
 
@@ -95,8 +101,8 @@ public sealed class DoWebApiController : WebApiController
         {
             await _openShockControl.Control(controls, customName);
             _logger.LogInformation(
-                "PiShock Do API: control command: {ControlType} {Intensity}% for {Duration}s on shocker {ShockerId} by {Name}",
-                controlType, intensity, durationMs / 1000.0, shockerId, customName);
+                "PiShock Do API: control command: {ControlType} {Intensity}% for {Duration}s on {ShockerCount} shocker(s) by {Name}",
+                controlType, intensity, durationMs / 1000.0, controls.Length, customName);
             await HttpContext.SendStringAsync(
                 JsonSerializer.Serialize(new { success = true, message = "Operation Succeeded." }),
                 "application/json", Encoding.UTF8);
@@ -137,7 +143,7 @@ public sealed class DoWebApiController : WebApiController
             return;
         }
 
-        if (!_service.Config.ShareCodeMappings.TryGetValue(request.Code, out var shockerId))
+        if (!_service.Config.ShareCodeMappings.TryGetValue(request.Code, out var mapping))
         {
             _logger.LogError("Share code not mapped to any shocker: {Code}", request.Code);
             HttpContext.Response.StatusCode = 404;
@@ -147,10 +153,10 @@ public sealed class DoWebApiController : WebApiController
 
         var info = new
         {
-            clientId = shockerId,
+            clientId = mapping.ShockerIds.FirstOrDefault(),
             name = $"Shocker ({request.Code})",
-            maxIntensity = 100,
-            maxDuration = 15,
+            maxIntensity = (int)mapping.MaxIntensity,
+            maxDuration = (int)mapping.MaxDuration,
             online = true
         };
 
