@@ -79,8 +79,8 @@ public sealed class PsWebApiController : WebApiController
             _ => ControlType.Vibrate
         };
 
-        var durationMs = (ushort)Math.Clamp(request.Duration * 1000, mapping.MinDuration * 1000, mapping.MaxDuration * 1000);
-        var intensity = (byte)Math.Clamp(request.Intensity, mapping.MinIntensity, mapping.MaxIntensity);
+        var durationMs = (ushort)Math.Clamp(request.Duration * 1000, mapping.EffectiveMinDuration * 1000, mapping.EffectiveMaxDuration * 1000);
+        var intensity = (byte)Math.Clamp(request.Intensity, mapping.EffectiveMinIntensity, mapping.EffectiveMaxIntensity);
 
         if (request.Intensity <= 0) controlType = ControlType.Stop;
 
@@ -130,8 +130,8 @@ public sealed class PsWebApiController : WebApiController
                     name = shockerInfo?.Name ?? $"Shocker ({shareCode})",
                     shareCode,
                     isPaused = false,
-                    maxIntensity = (int)mapping.MaxIntensity,
-                    maxDuration = (int)mapping.MaxDuration
+                    maxIntensity = (int)mapping.EffectiveMaxIntensity,
+                    maxDuration = (int)mapping.EffectiveMaxDuration
                 });
             }
         }
@@ -168,8 +168,8 @@ public sealed class PsWebApiController : WebApiController
                 code = shareCode,
                 shockerName = shockerInfo?.Name ?? $"Shocker ({shareCode})",
                 isPaused = false,
-                maxIntensity = (int)mapping.MaxIntensity,
-                maxDuration = (int)mapping.MaxDuration,
+                maxIntensity = (int)mapping.EffectiveMaxIntensity,
+                maxDuration = (int)mapping.EffectiveMaxDuration,
                 permissions = new
                 {
                     shock = true,
@@ -206,8 +206,8 @@ public sealed class PsWebApiController : WebApiController
                 code = shareCode,
                 shockerName = shockerInfo?.Name ?? $"Shocker ({shareCode})",
                 isPaused = false,
-                maxIntensity = (int)mapping.MaxIntensity,
-                maxDuration = (int)mapping.MaxDuration,
+                maxIntensity = (int)mapping.EffectiveMaxIntensity,
+                maxDuration = (int)mapping.EffectiveMaxDuration,
                 online = true,
                 permissions = new
                 {

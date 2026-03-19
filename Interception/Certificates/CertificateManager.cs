@@ -76,6 +76,8 @@ public sealed class CertificateManager : IDisposable
         return cert;
     }
 
+    private static readonly string[] RequiredDnsNames = ["do.pishock.com", "ps.pishock.com"];
+
     private static async Task<X509Certificate2> LoadOrCreateServerCert(string path, X509Certificate2 caCert)
     {
         if (File.Exists(path))
@@ -89,7 +91,7 @@ public sealed class CertificateManager : IDisposable
 
             var loaded = X509CertificateLoader.LoadPkcs12(buffer, CertPassword,
                 X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
-            if (loaded.NotAfter > DateTime.UtcNow.AddDays(30))
+            if (loaded.NotAfter > DateTime.UtcNow.AddDays(30) && HasRequiredSans(loaded))
                 return loaded;
             loaded.Dispose();
         }
@@ -126,6 +128,15 @@ public sealed class CertificateManager : IDisposable
         await File.WriteAllBytesAsync(path, exported.Export(X509ContentType.Pfx, CertPassword));
 
         return exported;
+    }
+
+    private static bool HasRequiredSans(X509Certificate2 cert)
+    {
+        var sanExtension = cert.Extensions.OfType<X509SubjectAlternativeNameExtension>().FirstOrDefault();
+        if (sanExtension == null) return false;
+
+        var dnsNames = sanExtension.EnumerateDnsNames().ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return RequiredDnsNames.All(dnsNames.Contains);
     }
 
     private bool CheckCaTrusted()

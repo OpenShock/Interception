@@ -18,9 +18,10 @@ public sealed class HostsFileManager
 
     public async Task EnableAsync()
     {
-        if (IsEnabled) return;
+        if (IsEnabled && !NeedsUpdate) return;
         await RunElevatedHostsCommand("add");
         IsEnabled = true;
+        NeedsUpdate = false;
         await FlushDns();
     }
 
@@ -32,16 +33,22 @@ public sealed class HostsFileManager
         await FlushDns();
     }
 
+    public bool NeedsUpdate { get; private set; }
+
     public async Task DetectCurrentState()
     {
         try
         {
             var content = await File.ReadAllTextAsync(HostsPath);
-            IsEnabled = content.Contains(Marker);
+            var hasAny = content.Contains(Marker);
+            var hasAll = content.Contains("do.pishock.com") && content.Contains("ps.pishock.com");
+            IsEnabled = hasAny;
+            NeedsUpdate = hasAny && !hasAll;
         }
         catch
         {
             IsEnabled = false;
+            NeedsUpdate = false;
         }
     }
 
@@ -50,14 +57,21 @@ public sealed class HostsFileManager
         string script;
         if (action == "add")
         {
+            // Check each host entry individually so upgrades from the old
+            // single-entry format pick up the new ps.pishock.com line.
             var linesArray = string.Join(",", HostEntries.Select(e => $"'{e}'"));
             script = string.Join("\n",
                 $"$lines = @({linesArray});",
                 $"$hostsPath = '{HostsPath}';",
                 "$content = Get-Content $hostsPath -Raw -ErrorAction SilentlyContinue;",
-                "if ($content -notmatch 'OpenShock Interception') {",
-                "    $toAdd = \"`n\" + ($lines -join \"`n\");",
-                "    Add-Content -Path $hostsPath -Value $toAdd -NoNewline:$false",
+                "if (-not $content) { $content = '' }",
+                "$added = $false;",
+                "foreach ($line in $lines) {",
+                "    $host = ($line -split '\\s+')[1];",
+                "    if ($content -notmatch [regex]::Escape($host)) {",
+                "        Add-Content -Path $hostsPath -Value \"`n$line\" -NoNewline:$false;",
+                "        $added = $true",
+                "    }",
                 "}");
         }
         else
