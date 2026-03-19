@@ -35,12 +35,16 @@ public sealed class InterceptionService(
         var cert = certManager.ServerCertificate;
 
         var operateController = ActivatorUtilities.CreateInstance<DoWebApiController>(serviceProvider);
+        var psController = ActivatorUtilities.CreateInstance<PsWebApiController>(serviceProvider);
+        var healthController = new HealthWebApiController();
 
         _server = new WebServer(o => o
                     .WithUrlPrefix($"https://*:{port}/")
                     .WithMode(HttpListenerMode.EmbedIO)
                     .WithCertificate(cert))
                 .WithWebApi("/api", m => m.WithController(() => operateController))
+                .WithWebApi("/PiShock", m => m.WithController(() => psController))
+                .WithWebApi("/Health", m => m.WithController(() => healthController))
             ;
 
         _ = _server.RunAsync();
