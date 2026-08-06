@@ -2,6 +2,7 @@
 @using OpenShock.Desktop.ModuleBase.Api
 @using OpenShock.Desktop.Modules.Interception.Certificates
 @using OpenShock.Desktop.Modules.Interception.HostsFile
+@using OpenShock.Desktop.Modules.Interception.Server
 <MudPaper Outlined="true" Class="settings-wrap">
     <!-- Title -->
     <MudText Typo="Typo.h6" Class="mb-2">PiShock API Interception</MudText>
@@ -28,7 +29,7 @@
     <MudPaper Class="pa-4 mb-4 rounded-lg" Outlined="true">
         <MudText Typo="Typo.h6" Class="mb-2">Hosts File Redirect</MudText>
         <MudText Typo="Typo.body2" Class="mb-2">
-            Redirects do.pishock.com to 127.0.0.1 via the system hosts file.
+            Redirects do.pishock.com and ps.pishock.com to 127.0.0.1 via the system hosts file.
             Each action requires administrator elevation.
         </MudText>
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
@@ -81,43 +82,84 @@
     <MudPaper Class="pa-4 mb-4 rounded-lg" Outlined="true">
         <MudText Typo="Typo.h6" Class="mb-2">Share Code Mappings</MudText>
         <MudText Typo="Typo.body2" Class="mb-2">
-            Map PiShock share codes to OpenShock shockers.
+            Map PiShock share codes to OpenShock shockers. Each mapping can target multiple shockers
+            and has configurable intensity/duration limits.
         </MudText>
 
         <MudTable Items="@Service.Config.ShareCodeMappings" Dense="true" Hover="true">
             <HeaderContent>
                 <MudTh>Share Code</MudTh>
-                <MudTh>OpenShock Shocker</MudTh>
-                <MudTh Style="width: 60px;"></MudTh>
+                <MudTh>OpenShock Shockers</MudTh>
+                <MudTh>Intensity</MudTh>
+                <MudTh>Duration</MudTh>
+                <MudTh Style="width: 100px;"></MudTh>
             </HeaderContent>
             <RowTemplate>
                 <MudTd>@context.Key</MudTd>
-                <MudTd>@GetShockerName(context.Value)</MudTd>
+                <MudTd>@GetShockerNames(context.Value)</MudTd>
+                <MudTd>@context.Value.MinIntensity–@context.Value.MaxIntensity%</MudTd>
+                <MudTd>@context.Value.MinDuration–@context.Value.MaxDuration s</MudTd>
                 <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                   Color="Color.Primary" OnClick="@(() => EditMapping(context.Key, context.Value))"/>
                     <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
                                    Color="Color.Error" OnClick="@(() => RemoveMapping(context.Key))"/>
                 </MudTd>
             </RowTemplate>
         </MudTable>
 
-        <MudStack Row="true" AlignItems="AlignItems.End" Class="mt-3" Spacing="2">
-            <MudTextField T="string" Value="@_newShareCode" ValueChanged="@((string v) => _newShareCode = v)"
-                          Label="Share Code" Style="max-width: 200px;"/>
-            <MudSelect T="Guid" Value="@_selectedShockerId" ValueChanged="@((Guid v) => _selectedShockerId = v)"
-                       Label="Shocker" Style="max-width: 300px;">
-                @foreach (var hub in OpenShockData.Hubs.Value)
-                {
-                    foreach (var shocker in hub.Shockers)
+        @* Add / Edit Mapping Form *@
+        <MudPaper Class="pa-3 mt-3 rounded-lg" Outlined="true">
+            <MudText Typo="Typo.subtitle1" Class="mb-2">@(_editingShareCode != null ? "Edit Mapping" : "Add Mapping")</MudText>
+
+            <MudStack Spacing="2">
+                <MudTextField T="string" Value="@_newShareCode" ValueChanged="@((string v) => _newShareCode = v)"
+                              Label="Share Code" Style="max-width: 300px;"
+                              Disabled="@(_editingShareCode != null)"/>
+
+                <MudSelect T="Guid" Label="Shockers" MultiSelection="true"
+                           SelectedValues="@_selectedShockerIds"
+                           SelectedValuesChanged="@((IEnumerable<Guid> v) => _selectedShockerIds = v.ToHashSet())"
+                           MultiSelectionTextFunc="@(ids => string.Join(", ", ids.Select(id => Guid.TryParse(id, out var g) ? GetShockerName(g) : id)))"
+                           Style="max-width: 500px;">
+                    @foreach (var hub in OpenShockData.Hubs.Value)
                     {
-                        <MudSelectItem T="Guid" Value="@shocker.Id">@hub.Name / @shocker.Name</MudSelectItem>
+                        foreach (var shocker in hub.Shockers)
+                        {
+                            <MudSelectItem T="Guid" Value="@shocker.Id">@hub.Name / @shocker.Name</MudSelectItem>
+                        }
                     }
-                }
-            </MudSelect>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@AddMapping"
-                       Disabled="@(string.IsNullOrWhiteSpace(_newShareCode) || _selectedShockerId == Guid.Empty)">
-                Add
-            </MudButton>
-        </MudStack>
+                </MudSelect>
+
+                <MudStack Row="true" Spacing="2">
+                    <MudNumericField T="byte" Label="Min Intensity" Value="@_minIntensity"
+                                     ValueChanged="@((byte v) => _minIntensity = v)" Min="1" Max="100"
+                                     Style="max-width: 130px;"/>
+                    <MudNumericField T="byte" Label="Max Intensity" Value="@_maxIntensity"
+                                     ValueChanged="@((byte v) => _maxIntensity = v)" Min="1" Max="100"
+                                     Style="max-width: 130px;"/>
+                    <MudNumericField T="ushort" Label="Min Duration (s)" Value="@_minDuration"
+                                     ValueChanged="@((ushort v) => _minDuration = v)" Min="1" Max="30"
+                                     Style="max-width: 150px;"/>
+                    <MudNumericField T="ushort" Label="Max Duration (s)" Value="@_maxDuration"
+                                     ValueChanged="@((ushort v) => _maxDuration = v)" Min="1" Max="30"
+                                     Style="max-width: 150px;"/>
+                </MudStack>
+
+                <MudStack Row="true" Spacing="2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@SaveMapping"
+                               Disabled="@(string.IsNullOrWhiteSpace(_newShareCode) || _selectedShockerIds.Count == 0)">
+                        @(_editingShareCode != null ? "Save" : "Add")
+                    </MudButton>
+                    @if (_editingShareCode != null)
+                    {
+                        <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="@CancelEdit">
+                            Cancel
+                        </MudButton>
+                    }
+                </MudStack>
+            </MudStack>
+        </MudPaper>
     </MudPaper>
 </MudPaper>
 
@@ -139,7 +181,12 @@
     [ModuleInject] public required HostsFileManager HostsManager { get; set; }
 
     private string _newShareCode = string.Empty;
-    private Guid _selectedShockerId;
+    private HashSet<Guid> _selectedShockerIds = [];
+    private byte _minIntensity = 1;
+    private byte _maxIntensity = 100;
+    private ushort _minDuration = 1;
+    private ushort _maxDuration = 15;
+    private string? _editingShareCode;
 
     private async Task OnServerToggle(bool value)
     {
@@ -179,19 +226,64 @@
         StateHasChanged();
     }
 
-    private async Task AddMapping()
+    private void EditMapping(string shareCode, ShareCodeMapping mapping)
     {
-        if (string.IsNullOrWhiteSpace(_newShareCode) || _selectedShockerId == Guid.Empty) return;
-        await Service.UpdateConfig(c => c.ShareCodeMappings[_newShareCode] = _selectedShockerId);
-        _newShareCode = string.Empty;
-        _selectedShockerId = Guid.Empty;
+        _editingShareCode = shareCode;
+        _newShareCode = shareCode;
+        _selectedShockerIds = [.. mapping.ShockerIds];
+        _minIntensity = mapping.MinIntensity;
+        _maxIntensity = mapping.MaxIntensity;
+        _minDuration = mapping.MinDuration;
+        _maxDuration = mapping.MaxDuration;
+        StateHasChanged();
+    }
+
+    private void CancelEdit()
+    {
+        ResetForm();
+        StateHasChanged();
+    }
+
+    private async Task SaveMapping()
+    {
+        if (string.IsNullOrWhiteSpace(_newShareCode) || _selectedShockerIds.Count == 0) return;
+
+        var mapping = new ShareCodeMapping
+        {
+            ShockerIds = _selectedShockerIds.ToList(),
+            MinIntensity = _minIntensity,
+            MaxIntensity = _maxIntensity,
+            MinDuration = _minDuration,
+            MaxDuration = _maxDuration
+        };
+
+        await Service.UpdateConfig(c => c.ShareCodeMappings[_newShareCode] = mapping);
+        ResetForm();
         StateHasChanged();
     }
 
     private async Task RemoveMapping(string code)
     {
         await Service.UpdateConfig(c => c.ShareCodeMappings.Remove(code));
+        if (_editingShareCode == code) ResetForm();
         StateHasChanged();
+    }
+
+    private void ResetForm()
+    {
+        _editingShareCode = null;
+        _newShareCode = string.Empty;
+        _selectedShockerIds = [];
+        _minIntensity = 1;
+        _maxIntensity = 100;
+        _minDuration = 1;
+        _maxDuration = 15;
+    }
+
+    private string GetShockerNames(ShareCodeMapping mapping)
+    {
+        if (mapping.ShockerIds.Count == 0) return "(none)";
+        return string.Join(", ", mapping.ShockerIds.Select(GetShockerName));
     }
 
     private string GetShockerName(Guid shockerId)
